@@ -1,0 +1,530 @@
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE 3
+OBJECT MODULE PLACED IN 3.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE 3.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include<reg52.h>
+   2          #include<intrins.h>
+   3          #define uchar unsigned char//宏定义
+   4          #define uint unsigned int//宏定义 
+   5          uchar  hour,min,sec;              //显示时间
+   6          uchar  hour1=0,min1=0,sec1=0;     //设定闹钟时间
+   7          uchar  hour2=0,min2=0,sec2=0;     //中间比较时间
+   8          uchar  shi,fen,miao;
+   9          uchar nian,yue,ri;
+  10          uchar year,month,day;
+  11          uchar n,j;
+  12          uchar c = 1;  //清零一次
+  13          uchar key = 0;
+  14          uchar noiscum = 0;
+  15          uchar data_7seg[]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90}; //时钟数码管显示定义0~9
+  16           uchar n=0;//S1按键功能选择常数
+  17          sbit sck=P1^1;//定义控制DS1302的时钟线
+  18          sbit io=P1^0;//定义控制DS1302的串行数据
+  19          sbit rst=P1^2;// 复位线
+  20          sbit P3_5=P3^5;    //按键S1
+  21          sbit P3_6=P3^6;     //按键S2
+  22          sbit P3_7=P3^7;     //按键S3
+  23          sbit P3_1=P3^1;     //按键S3
+  24          sbit led=P1^7;
+  25          sbit nois = P1^6;
+  26          ////函数声明
+  27          //void write_ds1302_byte(uchar dat); //写一个字节
+  28          //void write_ds1302(uchar add,uchar dat);          //写多个字节
+  29          //uchar read_ds_1302(uchar add);                          //读取
+  30          //void read_rtc();                                        //读取时间
+  31          //void set_rtc();                                                 //调整时间
+  32          //void display();                                                 //显示时间
+  33          //void delay(int n);                                     //延时函数
+  34          ////ms延时函数
+  35          void delayms(uint n)
+  36          {
+  37   1         uchar i;
+  38   1         while(n--)
+  39   1         for(i=0;i<113;i++);
+  40   1      }
+  41          /*DS1302单字节写入；*/
+  42          void write_ds1302_byte(uchar dat)
+  43          {
+  44   1           uchar i;
+  45   1               for(i=0;i<8;i++)
+  46   1               {
+  47   2                  sck=0;       
+  48   2                      io=dat&0x01;      //每次从低字节开始传输
+  49   2                      dat=dat>>1;
+  50   2                      sck=1;
+  51   2              }
+  52   1      }
+  53          /*DS1302 多字节写入；*/
+  54          void write_ds1302(uchar add,uchar dat)
+  55          {
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 2   
+
+  56   1           rst=0;_nop_();              //res引脚为低，数据传输中止
+  57   1               sck=0; _nop_();              //清零时钟总线
+  58   1               rst=1;_nop_();             //res引脚为高，逻辑控制有效
+  59   1               write_ds1302_byte(add);    
+  60   1               write_ds1302_byte(dat);    
+  61   1               rst=0;_nop_();
+  62   1               io=1;
+  63   1               sck=1;
+  64   1      }
+  65          /*DS1302读取；*/
+  66          uchar read_ds1302(uchar add)
+  67          {
+  68   1          uchar i,value;
+  69   1              rst=0;_nop_();
+  70   1              sck=0;_nop_();
+  71   1              rst=1;_nop_();
+  72   1              write_ds1302_byte(add);  //发送地址
+  73   1              for(i=0;i<8;i++)
+  74   1              {
+  75   2                  value=value>>1;
+  76   2                      sck=0;
+  77   2                      if(io)value=value|0x80;   //从低到高
+  78   2                      sck=1;
+  79   2              }
+  80   1               rst=0;_nop_();
+  81   1               sck=0;_nop_();
+  82   1               sck=1;
+  83   1               io=1;
+  84   1               return value;
+  85   1      }
+  86          /*按键控制时钟/闹钟模式*/
+  87          void set_rtc()
+  88          {
+  89   1      if(P3_1 == 0)
+  90   1      {
+  91   2         delayms(30);
+  92   2                  if(P3_1==0)
+  93   2                   {
+  94   3                              while(!P3_1);
+  95   3                          key = 1;       //根据按次数控制模式
+  96   3                   }
+  97   2      }
+  98   1              if(P3_5==0)      //按下是0
+  99   1              {
+ 100   2                      delayms(30);
+ 101   2                  if(P3_5==0)
+ 102   2                   {
+ 103   3                              while(!P3_5);
+ 104   3                          n++;           //根据按次数控制模式
+ 105   3                   }
+ 106   2                      if(n>=3)
+ 107   2                      n=0;
+ 108   2          }
+ 109   1        if(P3_6==0)    
+ 110   1          {
+ 111   2               delayms(100);
+ 112   2           if(P3_6==0)
+ 113   2                {
+ 114   3                              while(!P3_6);
+ 115   3                               j++;           //根据按键次数控制模式
+ 116   3                        }
+ 117   2              if(j>=3)
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 3   
+
+ 118   2              j=0;
+ 119   2           }
+ 120   1        if(n==0)        //显示时间
+ 121   1         {   
+ 122   2          if(j==0) //时
+ 123   2              {
+ 124   3                  shi=P3_7;
+ 125   3             if(shi==0)
+ 126   3                 {
+ 127   4                 delayms(300);
+ 128   4                  if(shi==0)
+ 129   4                      { 
+ 130   5                          hour=(hour>>4)*10+(hour&0x0f);
+ 131   5                              hour++;
+ 132   5                              if(hour==24) hour=0;
+ 133   5                              hour=((hour/10)<<4)+(hour%10);
+ 134   5                              write_ds1302(0x84,hour);
+ 135   5                       }
+ 136   4                   }
+ 137   3                      }
+ 138   2                if(j==1)              //分
+ 139   2                 {
+ 140   3                   fen=P3_7;
+ 141   3                  if(fen==0)
+ 142   3                      { delayms(300);
+ 143   4                              if(fen==0)
+ 144   4                              {
+ 145   5                          min=(min>>4)*10+(min&0x0f);
+ 146   5                              min++;
+ 147   5                              if(min==60) min=0;
+ 148   5                              min=((min/10)<<4)+(min%10);
+ 149   5                              write_ds1302(0x82,min);
+ 150   5                         }
+ 151   4                  }
+ 152   3                }
+ 153   2                if(j==2)                //秒
+ 154   2                {
+ 155   3                  miao=P3_7;
+ 156   3                   if(miao==0)
+ 157   3                   {
+ 158   4                   delayms(300);
+ 159   4                    if(miao==0)
+ 160   4                         { 
+ 161   5                          sec=(sec>>4)*10+(sec&0x0f);
+ 162   5                              sec++;
+ 163   5                              if(sec==60) sec=0;
+ 164   5                              sec=((sec/10)<<4)+(sec%10);
+ 165   5                              write_ds1302(0x80,sec);
+ 166   5                         }
+ 167   4                   }
+ 168   3                }
+ 169   2         }
+ 170   1      
+ 171   1        if(n==1)         //显示日历
+ 172   1         {    
+ 173   2         if(j==3)j=0;
+ 174   2           { 
+ 175   3              if(j==0)
+ 176   3                 {     
+ 177   4                  nian=P3_7;
+ 178   4                   if(nian==0)
+ 179   4                   {     
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 4   
+
+ 180   5                   delayms(300);
+ 181   5                    if(nian==0)
+ 182   5                         { 
+ 183   6                          year=(year>>4)*10+(year&0x0f);
+ 184   6                              year++;
+ 185   6                              if(year==100) year=0;
+ 186   6                              year=((year/10)<<4)+(year%10);
+ 187   6                              write_ds1302(0x8c,year);
+ 188   6                         }
+ 189   5                   }
+ 190   4                }
+ 191   3                      if(j==1)
+ 192   3                {
+ 193   4                  yue=P3_7;
+ 194   4                   if(yue==0)
+ 195   4                   {
+ 196   5                   delayms(300);
+ 197   5                    if(yue==0)
+ 198   5                         { 
+ 199   6                          month=(month>>4)*10+(month&0x0f);
+ 200   6                              month++;                  
+ 201   6                              if(month==13) month=0;
+ 202   6                              month=((month/10)<<4)+(month%10);
+ 203   6                              write_ds1302(0x88,month);
+ 204   6                         }
+ 205   5                   }
+ 206   4                }
+ 207   3                
+ 208   3               if(j==2)
+ 209   3               {ri=P3_7;
+ 210   4                if(ri==0)
+ 211   4                {
+ 212   5                delayms(300);
+ 213   5                  if(ri==0)
+ 214   5                      { 
+ 215   6                          day=(day>>4)*10+(day&0x0f);
+ 216   6                              day++;
+ 217   6                              if(day==31) day=0;
+ 218   6                              day=((day/10)<<4)+(day%10);
+ 219   6                              write_ds1302(0x86,day);
+ 220   6                       }
+ 221   5                } 
+ 222   4                  
+ 223   4          } 
+ 224   3        }
+ 225   2       }
+ 226   1       if(n==2)                //设定闹钟时间
+ 227   1       {       while(c)
+ 228   2               {
+ 229   3           P2=0x01;
+ 230   3               P0=data_7seg[0/16];
+ 231   3               delayms(4);
+ 232   3               P2=0x02;
+ 233   3               P0=data_7seg[0%16];
+ 234   3               delayms(4);
+ 235   3               P2=0x04;
+ 236   3               P0=~0x40;
+ 237   3               delayms(4);
+ 238   3               P2=0x08;
+ 239   3               P0=data_7seg[0/16];
+ 240   3               delayms(4);
+ 241   3               P2=0x10;
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 5   
+
+ 242   3               P0=data_7seg[0%16];
+ 243   3               delayms(4);
+ 244   3               P2=0x20;
+ 245   3               P0=~0x40;
+ 246   3               delayms(4);
+ 247   3               P2=0x40;
+ 248   3               P0=data_7seg[0/16];
+ 249   3               delayms(4);
+ 250   3               P2=0x80;
+ 251   3               P0=data_7seg[0%16];
+ 252   3               delayms(4);      //清显示
+ 253   3               c=c-1;
+ 254   3               }
+ 255   2              if(j==0) //时
+ 256   2              {
+ 257   3                  shi=P3_7;
+ 258   3             if(shi==0)
+ 259   3                 {
+ 260   4                 delayms(300);
+ 261   4                  if(shi==0)
+ 262   4                      {
+ 263   5                      //hour=(hour>>4)*10+(hour&0x0f);
+ 264   5                              hour1++;
+ 265   5                              if(hour1==24) hour1=0;
+ 266   5                              //hour1=((hour1/10)<<4)+(hour1%10);
+ 267   5                              //write_ds1302(0x84,hour);
+ 268   5                              //hour1 = hour;
+ 269   5                       }
+ 270   4                   }
+ 271   3                      }
+ 272   2                if(j==1)              //分
+ 273   2                 {
+ 274   3                   fen=P3_7;
+ 275   3                  if(fen==0)
+ 276   3                      { delayms(300);
+ 277   4                              if(fen==0)
+ 278   4                              {
+ 279   5                          //min=(min>>4)*10+(min&0x0f);
+ 280   5                              min1++;
+ 281   5                              if(min1==60) min1=0;
+ 282   5                              //min1=((min1/10)<<4)+(min1%10);
+ 283   5                              //write_ds1302(0x82,min);
+ 284   5                              //min1 = min;
+ 285   5                         }
+ 286   4                  }
+ 287   3                }
+ 288   2                if(j==2)                //秒
+ 289   2                {
+ 290   3                  miao=P3_7;
+ 291   3                   if(miao==0)
+ 292   3                   {
+ 293   4                   delayms(300);
+ 294   4                    if(miao==0)
+ 295   4                         { 
+ 296   5                          //sec=(sec>>4)*10+(sec&0x0f);
+ 297   5                              sec1++;
+ 298   5                              if(sec1==60) sec1=0;
+ 299   5                              //sec1=((sec1/10)<<4)+(sec%10);
+ 300   5                              //write_ds1302(0x80,sec);
+ 301   5                               // sec1 = sec;
+ 302   5                         }
+ 303   4                   }
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 6   
+
+ 304   3                }
+ 305   2        }
+ 306   1       }
+ 307          
+ 308          
+ 309          /*读取时间；*/
+ 310          void read_rtc()
+ 311          {
+ 312   1          hour=read_ds1302(0x85);     
+ 313   1      //      hour2=((hour/10)<<4)+(hour%10);
+ 314   1              min=read_ds1302(0x83);
+ 315   1      //      min2=((min/10)<<4)+(min%10);
+ 316   1              sec=read_ds1302(0x81);
+ 317   1      //      sec2=((sec/10)<<4)+(sec%10);
+ 318   1              year=read_ds1302(0x8d);
+ 319   1              month=read_ds1302(0x89);
+ 320   1              day=read_ds1302(0x87);
+ 321   1      }
+ 322          /*显示时间；*/
+ 323          void display()
+ 324          {
+ 325   1               
+ 326   1               P2=0x01;
+ 327   1               P0=data_7seg[hour/16];
+ 328   1               delayms(4);
+ 329   1               P2=0x02;
+ 330   1               P0=data_7seg[hour%16];
+ 331   1               delayms(4);
+ 332   1               P2=0x04;
+ 333   1               P0=~0x40;
+ 334   1               delayms(4);
+ 335   1               P2=0x08;
+ 336   1               P0=data_7seg[min/16];
+ 337   1               delayms(4);
+ 338   1               P2=0x10;
+ 339   1               P0=data_7seg[min%16];
+ 340   1               delayms(4);
+ 341   1               P2=0x20;
+ 342   1               P0=~0x40;
+ 343   1               delayms(4);
+ 344   1               P2=0x40;
+ 345   1               P0=data_7seg[sec/16];
+ 346   1               delayms(4);
+ 347   1               P2=0x80;
+ 348   1               P0=data_7seg[sec%16];
+ 349   1               delayms(4);
+ 350   1      }
+ 351          /*显示日历*/
+ 352          void display1()
+ 353          {
+ 354   1           P2=0x01;
+ 355   1               P0=data_7seg[2];
+ 356   1               delayms(4);
+ 357   1               P2=0x02;
+ 358   1               P0=data_7seg[0];
+ 359   1               delayms(4);
+ 360   1               P2=0x04;
+ 361   1               P0=data_7seg[year/16];
+ 362   1               delayms(4);
+ 363   1               P2=0x08;
+ 364   1               P0=data_7seg[year%16]&0x7f;
+ 365   1               delayms(4);
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 7   
+
+ 366   1               P2=0x10;
+ 367   1               P0=data_7seg[month/16];
+ 368   1               delayms(4);
+ 369   1               P2=0x20;
+ 370   1               P0=data_7seg[month%16]&0x7f;
+ 371   1               delayms(4);
+ 372   1               P2=0x40;
+ 373   1               P0=data_7seg[day/16];
+ 374   1               delayms(4);
+ 375   1               P2=0x80;
+ 376   1               P0=data_7seg[day%16];
+ 377   1               delayms(4);
+ 378   1      }
+ 379          
+ 380          void display2()            //显示闹钟
+ 381          {
+ 382   1           P2=0x01;
+ 383   1               P0=data_7seg[hour1/10];
+ 384   1               delayms(4);
+ 385   1               P2=0x02;
+ 386   1               P0=data_7seg[hour1%10];
+ 387   1               delayms(4);
+ 388   1               P2=0x04;
+ 389   1               P0=~0x40;
+ 390   1               delayms(4);
+ 391   1               P2=0x08;
+ 392   1               P0=data_7seg[min1/10];
+ 393   1               delayms(4);
+ 394   1               P2=0x10;
+ 395   1               P0=data_7seg[min1%10];
+ 396   1               delayms(4);
+ 397   1               P2=0x20;
+ 398   1               P0=~0x40;
+ 399   1               delayms(4);
+ 400   1               P2=0x40;
+ 401   1               P0=data_7seg[sec1/10];
+ 402   1               delayms(4);
+ 403   1               P2=0x80;
+ 404   1               P0=data_7seg[sec1%10];
+ 405   1               delayms(4);
+ 406   1      }
+ 407          ///*显示学号；*/
+ 408          //void show()
+ 409          //{
+ 410          //    uchar m;
+ 411          //      for(m=0;m<50;m++)
+ 412          //      {         
+ 413          //              P2=0x01;P0=data_7seg[7];delayms(4);
+ 414          //              P2=0x02;P0=data_7seg[5];delayms(4);
+ 415          //              P2=0x04;P0=data_7seg[0];delayms(4);
+ 416          //              P2=0x08;P0=data_7seg[4];delayms(4);
+ 417          //              P2=0x10;P0=data_7seg[4];delayms(4);
+ 418          //              P2=0x20;P0=data_7seg[2];delayms(4);
+ 419          //              P2=0x40;P0=data_7seg[0];delayms(4);     
+ 420          //              P2=0x80;P0=data_7seg[4];delayms(4);             
+ 421          //      }
+ 422          //}
+ 423          void  ss()
+ 424          {
+ 425   1          //uchar i;
+ 426   1      //   for(i=0;i<100;i++)
+ 427   1      //   {
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 8   
+
+ 428   1                 led=!led;
+ 429   1                 delayms(2);
+ 430   1      //   }
+ 431   1        }
+ 432          
+ 433          void main()
+ 434          {
+ 435   1      //     show();   
+ 436   1               write_ds1302(0x84,0x12);         //小时
+ 437   1               write_ds1302(0x82,0x00);        //分
+ 438   1               write_ds1302(0x80,0x00);       //秒
+ 439   1               write_ds1302(0x8c,0x18);                 //年
+ 440   1               write_ds1302(0x88,0x06);                //月
+ 441   1               write_ds1302(0x86,0x11);               //天
+ 442   1               nois = 0;
+ 443   1               while(1)
+ 444   1               {       
+ 445   2                  set_rtc();
+ 446   2              read_rtc();      //读取时间
+ 447   2                      hour2 = ((hour1/10)<<4)+(hour1%10);             //二进制的BCD码转化为十进制数
+ 448   2                      min2 = ((min1/10)<<4)+(min1%10);
+ 449   2                      sec2 = ((sec1/10)<<4)+(sec1%10);
+ 450   2                      if(hour2 == hour&&min2 == min&& sec2 == sec)//读取回时间和设定时间对比
+ 451   2                      {       
+ 452   3                              nois = 1;       
+ 453   3                      }
+ 454   2      //              if(key == 0)                    //key外部停止闹钟报警key == 1停止
+ 455   2      //                              {
+ 456   2      //                                      nois = 1;//做报警
+ 457   2      //                              }
+ 458   2                      if(key == 1)
+ 459   2                              { 
+ 460   3                                      nois = 0;//清除报警
+ 461   3                                      noiscum++;
+ 462   3                                      if(noiscum == 5)
+ 463   3                                      {
+ 464   4                                                noiscum =0;
+ 465   4                                                key = 0;
+ 466   4                                      }
+ 467   3      
+ 468   3                              }
+ 469   2                      if(n==0)           //时间
+ 470   2                      {
+ 471   3                              display();
+ 472   3                      }               
+ 473   2                      if(n==1)                 //日期
+ 474   2                      {               
+ 475   3                              display1();
+ 476   3                      }
+ 477   2                      if(n==2)                 //闹钟设定时间
+ 478   2                      {               
+ 479   3                              display2();
+ 480   3                      }
+ 481   2                      if(min==0&sec<5)   //五秒闪烁
+ 482   2                      {
+ 483   3                              ss();
+ 484   3                      }                   
+ 485   2                      else 
+ 486   2                      {
+ 487   3                      led=0x01;
+ 488   3                      }
+ 489   2            }
+C51 COMPILER V9.00   3                                                                     08/05/2018 17:19:33 PAGE 9   
+
+ 490   1      }
+ 491          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1419    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     33    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
